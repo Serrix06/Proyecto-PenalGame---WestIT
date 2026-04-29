@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PENAL GAME | PROFESSIONAL EDITION</title>
+    <style>
+        :root {
+            --accent: #00ff88;
+            --bg: #050505;
+            --text-main: #ffffff;
+            --text-dim: #666666;
+        }
+
+        body { 
+            margin: 0; 
+            background-color: var(--bg); 
+            color: var(--text-main); 
+            font-family: 'Inter', sans-serif; 
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #header { 
+            height: 12vh; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 0 60px;
+            background: var(--bg);
+            border-bottom: 1px solid #222;
+        }
+
+        .brand { font-weight: 300; letter-spacing: 8px; font-size: 18px; text-transform: uppercase; }
+        .brand b { font-weight: 700; color: var(--accent); }
+
+        .stats-group { display: flex; gap: 60px; }
+        .stat-box { text-align: right; }
+        .label { font-size: 10px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 4px; text-transform: uppercase; }
+        .val { font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+        #main-view { display: flex; height: 88vh; }
+
+        #side-ranking {
+            width: 280px;
+            padding: 40px;
+            background: rgba(255,255,255,0.02);
+            border-right: 1px solid #222;
+        }
+
+        .rank-item { 
+            margin-bottom: 15px; 
+            display: flex; 
+            justify-content: space-between; 
+            border-bottom: 1px solid #1a1a1a; 
+            padding-bottom: 5px;
+            font-size: 14px;
+        }
+
+        #canvas-wrap { 
+            flex-grow: 1;
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            background: radial-gradient(circle at center, #0d0d12 0%, #050505 100%);
+            position: relative;
+        }
+
+        canvas { display: block; border-radius: 4px; cursor: crosshair; }
+
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5,5,5,0.98);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .modal {
+            background: #fff;
+            padding: 60px;
+            color: #000;
+            text-align: center;
+            width: 400px;
+            border-radius: 2px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .difficulty-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .diff-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background: #f9f9f9;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .diff-btn.selected {
+            background: #000;
+            color: #fff;
+            border-color: #000;
+        }
+
+        button.main-action {
+            background: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        #game-message {
+            position: absolute; top: 40%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 80px; font-weight: 900;
+            display: none; z-index: 5;
+        }
+        .message-gol { color: var(--accent); }
+        .message-atajada { color: #ff4444; }
+
+        #ball-obj {
+            width: 50px; height: 50px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            bottom: 40px;
+            display: none;
+            background-image: 
+                radial-gradient(circle at 30% 30%, transparent 50%, rgba(0,0,0,0.1) 100%),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 100 100'%3E%3Cpath d='M50 5L20 25V55L50 75L80 55V25L50 5Z' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M20 25L0 15M20 55L0 65M50 75L50 100M80 55L100 65M80 25L100 15M50 5L50 0' stroke='black' stroke-width='2'/%3E%3C/svg%3E");
+            background-size: cover;
+            box-shadow: inset -5px -5px 15px rgba(0,0,0,0.2), 5px 10px 20px rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen" class="overlay">
+        <div class="modal">
+            <h2>NUEVA SESIÓN</h2>
+            <input type="text" id="player-name" placeholder="NOMBRE DEL JUGADOR" maxlength="12">
+            <div class="label" style="color: #666; margin-bottom: 10px; text-align: left;">DIFICULTAD</div>
+            <div class="difficulty-selector">
+                <button class="diff-btn selected" onclick="setDiff('facil', this)">FÁCIL</button>
+                <button class="diff-btn" onclick="setDiff('dificil', this)">DIFÍCIL</button>
+            </div>
+            <button id="btn-start" class="main-action">EMPEZAR</button>
+        </div>
+    </div>
+
+    <div id="results-screen" class="overlay" style="display: none;">
+        <div class="modal">
+            <h2>RESUMEN DE PARTIDA</h2>
+            <div id="final-stats" style="margin: 30px 0; line-height: 1.6;">
+                <div style="font-size: 24px; font-weight: 800;" id="res-nombre"></div>
+                <div style="font-size: 18px; color: #2ecc71;" id="res-goles"></div>
+                <div style="font-size: 18px; color: #e74c3c;" id="res-atajadas"></div>
+            </div>
+            <button class="main-action" onclick="location.reload()">VOLVER A JUGAR</button>
+        </div>
+    </div>
+
+    <div id="header">
+        <div class="brand">PENAL<b>GAME</b></div>
+        <div class="stats-group">
+            <div class="stat-box"><span class="label">JUGADOR</span><span id="display-name" class="val">---</span></div>
+            <div class="stat-box"><span class="label">GOLES</span><span id="score-goles" class="val">0</span></div>
+            <div class="stat-box"><span class="label">INTENTO</span><span id="current-turn" class="val">1/5</span></div>
+        </div>
+    </div>
+
+    <div id="main-view">
+        <div id="side-ranking">
+            <h3>TOP 5 GOLEADORES</h3>
+            <div id="ranking-list"></div>
+        </div>
+
+        <div id="canvas-wrap" onclick="testClick(event)">
+            <div id="game-message"></div>
+            <canvas id="gameCanvas"></canvas>
+            <div id="ball-obj"></div>
+        </div>
+    </div>
+
+    <script>
+        const MAX_TURNOS = 5;
+        const WS_URL = "ws://localhost:8765";
+        
+        let gameState = {
+            playerName: "", currentTurn: 0, goles: 0, atajadas: 0,
+            playing: false, animating: false, dificultad: 'facil'
+        };
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const ballObj = document.getElementById('ball-obj');
+        const msgObj = document.getElementById('game-message');
+
+        let arco = { x: 0, y: 0, w: 0, h: 0 };
+
+        function setDiff(val, btn) {
+            gameState.dificultad = val;
+            document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        }
+
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-wrap');
+            canvas.width = container.clientWidth * 0.95;
+            canvas.height = container.clientHeight * 0.9;
+            arco.w = canvas.width * 0.8;
+            arco.h = canvas.height * 0.75;
+            arco.x = (canvas.width - arco.w) / 2;
+            arco.y = (canvas.height - arco.h);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const portero = {
+            x: 0, y: 0, targetX: 0, targetY: 0, rotation: 0,
+            w: 80, h: 220, isJumping: false,
+            update: function() {
+                if (!this.isJumping) {
+                    this.x = canvas.width / 2 - this.w / 2;
+                    this.y = canvas.height - this.h;
+                    this.rotation = 0;
+                } else {
+                    this.x += (this.targetX - this.x) * 0.12;
+                    this.y += (this.targetY - this.y) * 0.12;
+                    let targetRot = (this.targetX - canvas.width/2) * 0.002;
+                    this.rotation += (targetRot - this.rotation) * 0.1;
+                }
+            },
+            draw: function() {
+                ctx.save();
+                ctx.translate(this.x + this.w/2, this.y + this.h/2);
+                ctx.rotate(this.rotation);
+                const ox = -this.w/2, oy = -this.h/2;
+                ctx.fillStyle = "#e0ac69";
+                ctx.beginPath(); ctx.arc(0, oy + 25, 22, 0, Math.PI*2); ctx.fill();
+                let grad = ctx.createLinearGradient(ox, 0, ox + this.w, 0);
+                grad.addColorStop(0, "#00cc6e"); grad.addColorStop(0.5, "#00ff88"); grad.addColorStop(1, "#00cc6e");
+                ctx.fillStyle = grad;
+                ctx.fillRect(ox + 10, oy + 50, this.w - 20, 90);
+                ctx.lineWidth = 18; ctx.strokeStyle = grad; ctx.lineCap = "round";
+                if(this.isJumping) {
+                    ctx.beginPath(); ctx.moveTo(ox + 10, oy + 65); ctx.lineTo(ox - 50, oy - 20); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(ox + this.w - 10, oy + 65); ctx.lineTo(ox + this.w + 50, oy - 20); ctx.stroke();
+                } else {
+                    ctx.beginPath(); ctx.moveTo(ox + 10, oy + 70); ctx.lineTo(ox - 15, oy + 120); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(ox + this.w - 10, oy + 70); ctx.lineTo(ox + this.w + 15, oy + 120); ctx.stroke();
+                }
+                ctx.fillStyle = "#1a1a1a";
+                ctx.fillRect(ox + 10, oy + 140, 25, 60);
+                ctx.fillRect(ox + this.w - 35, oy + 140, 25, 60);
+                ctx.fillStyle = "white";
+                ctx.fillRect(ox + 5, oy + 200, 35, 15);
+                ctx.fillRect(ox + this.w - 40, oy + 200, 35, 15);
+                ctx.fillStyle = "white";
+                if(this.isJumping) {
+                    ctx.beginPath(); ctx.arc(ox - 55, oy - 25, 12, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(ox + this.w + 55, oy - 25, 12, 0, Math.PI*2); ctx.fill();
+                } else {
+                    ctx.beginPath(); ctx.arc(ox - 20, oy + 125, 12, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(ox + this.w + 20, oy + 125, 12, 0, Math.PI*2); ctx.fill();
+                }
+                ctx.restore();
+            }
+        };
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = "#333"; ctx.lineWidth = 15;
+            ctx.strokeRect(arco.x, arco.y, arco.w, arco.h);
+            ctx.strokeStyle = "rgba(255,255,255,0.03)"; ctx.lineWidth = 1;
+            for(let i=arco.x; i<=arco.x+arco.w; i+=35) {
+                ctx.beginPath(); ctx.moveTo(i, arco.y); ctx.lineTo(i, arco.y+arco.h); ctx.stroke();
+            }
+            if (gameState.playing || gameState.animating) {
+                portero.update();
+                portero.draw();
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.getElementById('btn-start').onclick = function() {
+            const name = document.getElementById('player-name').value;
+            if (!name.trim()) return;
+            gameState.playerName = name.toUpperCase();
+            gameState.currentTurn = 1;
+            gameState.goles = 0;
+            gameState.atajadas = 0;
+            gameState.playing = true;
+            gameState.animating = false;
+            document.getElementById('display-name').innerText = gameState.playerName;
+            document.getElementById('login-screen').style.display = 'none';
+            updateScores();
+        };
+
+        function testClick(e) {
+            if (!gameState.playing || gameState.animating) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / canvas.width;
+            const y = (e.clientY - rect.top) / canvas.height;
+            procesarDisparo({x, y});
+        }
+
+        function procesarDisparo(coords) {
+            if (!gameState.playing || gameState.animating) return;
+            gameState.animating = true;
+            
+            // LÓGICA DE DIFICULTAD
+            let probAtajada = (gameState.dificultad === 'facil') ? 0.30 : 0.65;
+            const esGol = Math.random() > probAtajada;
+
+            portero.isJumping = true;
+            if (esGol) {
+                portero.targetX = (coords.x * canvas.width) + (coords.x > 0.5 ? -180 : 180);
+                portero.targetY = (coords.y * canvas.height) + 100;
+            } else {
+                portero.targetX = (coords.x * canvas.width) - portero.w/2;
+                portero.targetY = (coords.y * canvas.height) - portero.h/2;
+            }
+
+            ballObj.style.display = 'block';
+            ballObj.style.transition = 'none';
+            ballObj.style.left = '50%'; ballObj.style.top = '85%'; ballObj.style.transform = 'scale(1) rotate(0deg)';
+
+            setTimeout(() => {
+                ballObj.style.transition = 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                ballObj.style.left = `${coords.x * 100}%`;
+                ballObj.style.top = `${coords.y * 100}%`;
+                ballObj.style.transform = 'scale(0.35) rotate(720deg)';
+                
+                setTimeout(() => {
+                    if (esGol) { 
+                        gameState.goles++; 
+                        showMessage("¡GOL!", "message-gol"); 
+                    } else { 
+                        gameState.atajadas++;
+                        showMessage("ATAJADA", "message-atajada"); 
+                    }
+                    updateScores();
+                    setTimeout(() => {
+                        hideMessage();
+                        ballObj.style.display = 'none';
+                        portero.isJumping = false;
+                        gameState.animating = false;
+                        if (gameState.currentTurn >= MAX_TURNOS) endGame();
+                        else { gameState.currentTurn++; updateScores(); }
+                    }, 1200);
+                }, 600);
+            }, 50);
+        }
+
+        function updateScores() {
+            document.getElementById('score-goles').innerText = gameState.goles;
+            document.getElementById('current-turn').innerText = `${gameState.currentTurn}/${MAX_TURNOS}`;
+        }
+
+        function showMessage(text, className) {
+            msgObj.innerText = text; msgObj.className = className; msgObj.style.display = 'block';
+        }
+        function hideMessage() { msgObj.style.display = 'none'; }
+
+        function endGame() {
+            gameState.playing = false;
+            saveToRanking(gameState.playerName, gameState.goles);
+            document.getElementById('res-nombre').innerText = gameState.playerName;
+            document.getElementById('res-goles').innerText = `GOLES MARCADOS: ${gameState.goles}`;
+            document.getElementById('res-atajadas').innerText = `ATAJADAS DEL ARQUERO: ${gameState.atajadas}`;
+            document.getElementById('results-screen').style.display = 'flex';
+            loadRanking();
+        }
+
+        function saveToRanking(name, score) {
+            let r = JSON.parse(localStorage.getItem('penalRankingPro')) || [];
+            r.push({name, score}); r.sort((a,b) => b.score - a.score);
+            localStorage.setItem('penalRankingPro', JSON.stringify(r.slice(0, 5)));
+        }
+
+        function loadRanking() {
+            const r = JSON.parse(localStorage.getItem('penalRankingPro')) || [];
+            document.getElementById('ranking-list').innerHTML = r.map((x, i) => `
+                <div class="rank-item"><span>${i+1}. ${x.name}</span><b>${x.score}</b></div>
+            `).join('');
+        }
+
+        function conectarWebSocket() {
+            const ws = new WebSocket(WS_URL);
+            ws.onmessage = (e) => { try { procesarDisparo(JSON.parse(e.data)); } catch(err) {} };
+            ws.onclose = () => setTimeout(conectarWebSocket, 2000);
+        }
+
+        conectarWebSocket(); loadRanking(); gameLoop();
+    </script>
+</body>
+</html>
